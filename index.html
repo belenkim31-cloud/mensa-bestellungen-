@@ -22,5 +22,61 @@ function renderMeals(){document.querySelector('#meals').innerHTML=meals.map(m=>`
 function renderCart(){let box=document.querySelector('#cart');if(!cart.length){box.innerHTML='<div class="empty">Deine Bestellung ist noch leer.<br>Wähle ein Menü aus.</div>'}else{box.innerHTML=cart.map((id,i)=>{let m=meals.find(x=>x.id===id);return `<div class="orderline"><div><b>${m.name}</b><div class="muted small">${euro(m.price)}</div></div><button class="btn remove" data-remove="${i}">Entfernen</button></div>`}).join('');document.querySelectorAll('[data-remove]').forEach(b=>b.onclick=()=>{cart.splice(+b.dataset.remove,1);save();renderCart()})}document.querySelector('#total').textContent=euro(cart.reduce((s,id)=>s+meals.find(m=>m.id===id).price,0))}
 function save(){localStorage.setItem('mensa-cart',JSON.stringify(cart))}
 document.querySelector('#date').value=new Date().toISOString().slice(0,10);renderMeals();renderCart();
-document.querySelector('#checkout').onclick=()=>{if(!cart.length){alert('Bitte wähle zuerst ein Menü aus.');return}document.querySelector('#modal').classList.add('open')};document.querySelector('#cancel').onclick=()=>document.querySelector('#modal').classList.remove('open');document.querySelector('#confirm').onclick=()=>{let n=document.querySelector('#name').value.trim();if(!n){alert('Bitte gib deinen Namen ein.');return}let no='MV-'+Math.floor(100000+Math.random()*900000);document.querySelector('#modal').classList.remove('open');document.querySelector('#success').style.display='block';document.querySelector('#success').innerHTML=`<b>Bestellung erfolgreich!</b><br>Danke, ${n}. Deine Bestellnummer ist <b>${no}</b>. Abholung: ${document.querySelector('#pickup').value}.`;cart=[];save();renderCart();window.scrollTo({top:0,behavior:'smooth'})};
+document.querySelector('#checkout').onclick=()=>{if(!cart.length){alert('Bitte wähle zuerst ein Menü aus.');return}document.querySelector('#modal').classList.add('open')};document.querySelector('#cancel').onclick=()=>document.querySelector('#modal').classList.remove('open');document.querySelector('#confirm').onclick = async () => {
+  const n = document.querySelector('#name').value.trim();
+
+  if (!n) {
+    alert('Bitte gib deinen Namen ein.');
+    return;
+  }
+
+  const no = 'MV-' + Math.floor(100000 + Math.random() * 900000);
+
+  const menues = cart
+    .map(id => meals.find(m => m.id === id).name)
+    .join(', ');
+
+  const gesamtpreis = euro(
+    cart.reduce((summe, id) => {
+      return summe + meals.find(m => m.id === id).price;
+    }, 0)
+  );
+
+  const bestellung = {
+    bestellnummer: no,
+    name: n,
+    abholzeit: document.querySelector('#pickup').value,
+    abholort: document.querySelector('#location').value,
+    menues: menues,
+    gesamtpreis: gesamtpreis
+  };
+
+  try {
+    await fetch(
+      'https://script.google.com/macros/s/AKfycbxiaEZlDtQqva2UzmCvU69mBEs3-4F56-Yawk8pr-91hwSyV_GC8ELAyYbIB29Uo_U/exec',
+      {
+        method: 'POST',
+        mode: 'no-cors',
+        headers: {
+          'Content-Type': 'text/plain;charset=utf-8'
+        },
+        body: JSON.stringify(bestellung)
+      }
+    );
+
+    document.querySelector('#modal').classList.remove('open');
+    document.querySelector('#success').style.display = 'block';
+    document.querySelector('#success').innerHTML =
+      '<b>Bestellung erfolgreich gespeichert!</b><br>' +
+      'Danke, ' + n + '. Deine Bestellnummer ist <b>' + no + '</b>. ' +
+      'Abholung: ' + document.querySelector('#pickup').value + '.';
+
+    cart = [];
+    save();
+    renderCart();
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  } catch (fehler) {
+    alert('Die Bestellung konnte nicht an Google Sheets gesendet werden. Bitte versuche es erneut.');
+  }
+};
 </script></body></html>
